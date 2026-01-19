@@ -1,17 +1,20 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import './App.css'; 
+import React, { useState } from "react";
+import axios from "axios";
+// 👇 PayPal Imports
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js"; 
+import "./App.css";
+
 import Admin from './Admin';
 import Login from './Login';
 import UserDashboard from './UserDashboard'; 
-import { FaHeart, FaSeedling, FaChild } from 'react-icons/fa'; // Import new icons
+import { FaHeart, FaSeedling, FaChild } from 'react-icons/fa'; 
 
 function App() {
   const [currentPage, setCurrentPage] = useState('login'); 
   const [currentUser, setCurrentUser] = useState({}); 
   const [formData, setFormData] = useState({ amount: '' }); 
 
-  // --- LOGIC REMAINS EXACTLY THE SAME ---
+  // --- LOGIN / LOGOUT LOGIC ---
   const handleLogin = (role, userData) => {
       setCurrentUser(userData); 
       if (role === 'admin') setCurrentPage('admin');
@@ -21,49 +24,16 @@ function App() {
   const handleLogout = () => {
       setCurrentPage('login');
       setCurrentUser({});
-  };
-
-  const handleDonate = async (e) => {
-    e.preventDefault();
-    // 1. Save to DB
-    try {
-      await axios.post('http://localhost:5000/api/donate', {
-        email: currentUser.email, amount: formData.amount, status: "Pending"
-      });
-    } catch (err) { alert("Error saving data"); return; }
-
-    // 2. Hash
-    const orderId = "Order_" + new Date().getTime(); 
-    let hash;
-    try {
-        const res = await axios.post('http://localhost:5000/api/generate-hash', {
-            order_id: orderId, amount: formData.amount, currency: "LKR"
-        });
-        hash = res.data.hash;
-    } catch (err) { alert("Backend Error"); return; }
-
-    // 3. Payment
-    const payment = {
-      sandbox: true, merchant_id: "1233644", 
-      return_url: "http://localhost:3000/", cancel_url: "http://localhost:3000/",
-      notify_url: "http://localhost:5000/api/notify", order_id: orderId, items: "Donation",
-      amount: formData.amount, currency: "LKR", hash: hash, 
-      first_name: currentUser.name, last_name: "", email: currentUser.email, phone: currentUser.phone, address: "Col", city: "Col", country: "SL",
-    };
-
-    if (window.payhere) {
-        window.payhere.startPayment(payment);
-        window.payhere.onCompleted = function() { alert("Payment Successful!"); setCurrentPage('userDashboard'); };
-        window.payhere.onDismissed = function() { alert("Payment Skipped"); setCurrentPage('userDashboard'); };
-        window.payhere.onError = function(err) { alert("Error: " + err); };
-    }
+      setFormData({ amount: '' }); 
   };
 
   return (
     <div className="App">
       
+      {/* 1. LOGIN PAGE */}
       {currentPage === 'login' && <Login onLogin={handleLogin} />}
 
+      {/* 2. ADMIN DASHBOARD */}
       {currentPage === 'admin' && (
           <div style={{width: '100%'}}>
               <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
@@ -71,6 +41,7 @@ function App() {
           </div>
       )}
 
+      {/* 3. USER DASHBOARD */}
       {currentPage === 'userDashboard' && (
           <UserDashboard 
             userEmail={currentUser.email} 
@@ -79,10 +50,10 @@ function App() {
           />
       )}
 
-      {/* 🎨 DECORATED DONATION PAGE */}
+      {/* 4. DONATION PAGE (With INR Support) */}
       {currentPage === 'donateForm' && (
         <div className="container">
-          <div className="card" style={{maxWidth: '500px'}}>
+          <div className="card" style={{maxWidth: '500px', position: 'relative'}}>
             <button onClick={() => setCurrentPage('userDashboard')} style={styles.backBtn}>← Back</button>
             
             {/* Header Decoration */}
@@ -95,33 +66,100 @@ function App() {
             <div style={{background: '#f0fdf4', padding: '15px', borderRadius: '10px', border: '1px solid #bbf7d0', marginBottom: '20px'}}>
                 <h4 style={{margin: '0 0 10px 0', color: '#166534', fontSize: '14px'}}>What your donation can do:</h4>
                 <ul style={{fontSize: '12px', color: '#14532d', paddingLeft: '20px', margin: 0}}>
-                    <li style={{marginBottom: '5px'}}>LKR 500: Feeds a child for a day. <FaChild/></li>
-                    <li style={{marginBottom: '5px'}}>LKR 1000: Plants 2 saplings. <FaSeedling/></li>
-                    <li>LKR 5000: Sponsors education for a month. <FaHeart/></li>
+                    <li style={{marginBottom: '5px'}}>₹ 500: Feeds a child for a day. <FaChild/></li>
+                    <li style={{marginBottom: '5px'}}>₹ 1000: Plants 2 saplings. <FaSeedling/></li>
+                    <li>₹ 5000: Sponsors education for a month. <FaHeart/></li>
                 </ul>
             </div>
             
-            <form onSubmit={handleDonate} className="form">
+            {/* Donation Inputs */}
+            <div className="form">
                <div className="input-group">
                   <label>Donor Name</label>
-                  <input type="text" value={currentUser.name} readOnly style={{background:'#eee', cursor: 'not-allowed'}}/>
+                  <input type="text" value={currentUser.name || "Anonymous"} readOnly style={{background:'#eee', cursor: 'not-allowed'}}/>
               </div>
               
+              {/* 👇 Amount Input in INR (₹) */}
               <div className="input-group">
-                  <label>Amount (LKR)</label>
+                  <label style={{ color: "#166534", fontWeight: "bold" }}>Amount (₹ INR)</label>
                   <input 
                     type="number" 
-                    placeholder="Enter amount (e.g. 1000)"
+                    placeholder="Enter amount (e.g. 500)"
+                    value={formData.amount}
                     onChange={(e) => setFormData({...formData, amount: e.target.value})} 
                     required 
                     style={{fontSize: '18px', fontWeight: 'bold', color: '#4c1d95'}}
                   />
               </div>
 
-              <button type="submit" className="donate-btn big-btn">
-                 Proceed to Pay
-              </button>
-            </form>
+              {/* 👇 PAYPAL BUTTONS SECTION 👇 */}
+              <div style={{ marginTop: "20px", zIndex: "0" }}>
+                
+                <PayPalScriptProvider options={{ "client-id": "AdMpAG7oSD6GWweCB1pffd277NvxK7afQFprlXXiqQz6vOcjunYyBNKSn5REmDo2kWrPWz1BScS2SCGV" }}>
+                  
+                  <PayPalButtons 
+                    style={{ layout: "vertical" }} 
+                    
+                    // A. Create Order (with Auto-Conversion)
+                    createOrder={(data, actions) => {
+                      if (!formData.amount || formData.amount <= 0) {
+                        alert("Please enter a valid amount (₹) first!");
+                        return actions.reject();
+                      }
+
+                      // 💡 SMART CONVERSION: ₹ to $ (Approx 1 USD = 84 INR)
+                      // User inputs ₹500 -> PayPal gets $5.95
+                      const usdAmount = (formData.amount / 84).toFixed(2);
+
+                      return actions.order.create({
+                        purchase_units: [
+                          {
+                            amount: {
+                              value: usdAmount, // Sending Dollars to PayPal
+                              currency_code: "USD" 
+                            },
+                            description: `Donation of ₹${formData.amount}` // Receipt shows INR amount
+                          },
+                        ],
+                      });
+                    }}
+
+                    // B. Payment Success
+                    onApprove={(data, actions) => {
+                      return actions.order.capture().then(async (details) => {
+                        const name = details.payer.name.given_name;
+                        alert(`Payment Successful! Thank you ${name}`);
+                        
+                        // 🎉 Save ORIGINAL Rupee Amount (₹) to Database
+                        try {
+                             await axios.post('http://localhost:5000/api/donate', {
+                                email: currentUser.email, 
+                                amount: formData.amount, // Saving ₹500 (Not dollar amount)
+                                status: "Success",
+                                transactionId: details.id
+                             });
+                             console.log("Database Updated with INR Amount");
+                        } catch (err) {
+                             console.error("DB Error", err);
+                        }
+
+                        // Redirect user back to dashboard
+                        setCurrentPage('userDashboard');
+                      });
+                    }}
+                    
+                    // C. Error Handling
+                    onError={(err) => {
+                      console.error("PayPal Error:", err);
+                      alert("Payment Failed. Please try again.");
+                    }}
+                  />
+
+                </PayPalScriptProvider>
+              </div>
+              {/* 👆 PAYPAL SECTION ENDS 👆 */}
+
+            </div>
           </div>
         </div>
       )}

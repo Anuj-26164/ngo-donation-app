@@ -100,7 +100,8 @@ function Admin({ currentUser }) {
                 <div className="stat-card">
                     <div className="stat-icon" style={{background: '#dcfce7', color: '#166534'}}><FaMoneyBillWave/></div>
                     <div>
-                        <h3>LKR {totalCollection}</h3>
+                        {/* 👇 UPDATED TO RUPEE SYMBOL */}
+                        <h3>₹ {totalCollection}</h3>
                         <p>Total Collection</p>
                     </div>
                 </div>
@@ -238,7 +239,10 @@ function Admin({ currentUser }) {
                                 {allTransactions.map((t, index) => (
                                     <tr key={index}>
                                         <td>{t.donorName}<br/><span style={{fontSize:'11px', color:'#999'}}>{t.donorEmail}</span></td>
-                                        <td style={{fontWeight:'bold'}}>LKR {t.amount}</td>
+                                        
+                                        {/* 👇 UPDATED TO RUPEE SYMBOL */}
+                                        <td style={{fontWeight:'bold'}}>₹ {t.amount}</td>
+                                        
                                         <td>{new Date(t.date).toLocaleDateString()}</td>
                                         <td>{getStatusBadge(t.status)}</td>
                                     </tr>

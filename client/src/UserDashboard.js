@@ -36,7 +36,10 @@ function UserDashboard({ userEmail, onDonateClick, onLogout }) {
             <div className="stats-container">
                 <div className="stat-card">
                     <div className="stat-icon" style={{background: '#e0e7ff', color: '#6366f1'}}><FaWallet/></div>
-                    <div><h3>LKR {totalDonated}</h3><p>My Contribution</p></div>
+                    
+                    {/* 👇 UPDATED TO RUPEE SYMBOL */}
+                    <div><h3>₹ {totalDonated}</h3><p>My Contribution</p></div>
+                    
                 </div>
                 <div className="stat-card">
                     <div className="stat-icon" style={{background: '#dcfce7', color: '#166534'}}><FaHandHoldingHeart/></div>
@@ -102,7 +105,10 @@ function UserDashboard({ userEmail, onDonateClick, onLogout }) {
                             {user?.donations?.slice().reverse().map((item, index) => ( 
                                 <tr key={index}>
                                     <td>{new Date(item.date).toLocaleDateString()}</td>
-                                    <td style={{ fontWeight: 'bold' }}>LKR {item.amount}</td>
+                                    
+                                    {/* 👇 UPDATED TO RUPEE SYMBOL */}
+                                    <td style={{ fontWeight: 'bold' }}>₹ {item.amount}</td>
+                                    
                                     <td>{getStatusBadge(item.status)}</td>
                                 </tr>
                             ))}

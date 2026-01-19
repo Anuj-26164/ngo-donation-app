@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import './App.css';
 import { FiMail, FiLock, FiUser, FiPhone } from 'react-icons/fi';
-import { FaHandHoldingHeart } from 'react-icons/fa';
+// removed FaHandHoldingHeart since it wasn't used in the view, but you can keep it if needed
 
 function Login({ onLogin }) {
     const [isSignup, setIsSignup] = useState(false); 
@@ -14,7 +14,17 @@ function Login({ onLogin }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        // LOGIC SAME AS BEFORE (No Changes)
+
+        // 👇 FIX 1: VALIDATION LOGIC BEFORE API CALL 👇
+        if (isSignup) {
+            // Check if phone number is exactly 10 digits
+            if (!phone || phone.length !== 10) {
+                alert("Please enter a valid 10-digit Mobile Number!");
+                return; // 🛑 Stop here, do not send request
+            }
+        }
+
+        // --- EXISTING LOGIC ---
         if (isSignup) {
             try {
                 const res = await axios.post('http://localhost:5000/api/register', { name, email, phone, password });
@@ -64,9 +74,25 @@ function Login({ onLogin }) {
                                 <FiUser className="input-icon" />
                                 <input type="text" placeholder="Full Name" value={name} onChange={(e) => setName(e.target.value)} required style={{ paddingLeft: '40px' }} />
                             </div>
+                            
                             <div className="input-wrapper">
                                 <FiPhone className="input-icon" />
-                                <input type="text" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} required style={{ paddingLeft: '40px' }} />
+                                {/* 👇 FIX 2: RESTRICT INPUT TO NUMBERS & 10 DIGITS ONLY 👇 */}
+                                <input 
+                                    type="text" 
+                                    placeholder="Phone (10 digits)" 
+                                    maxLength="10" 
+                                    value={phone} 
+                                    onChange={(e) => {
+                                        // Only allow numbers (RegEx)
+                                        const re = /^[0-9\b]+$/;
+                                        if (e.target.value === '' || re.test(e.target.value)) {
+                                            setPhone(e.target.value);
+                                        }
+                                    }} 
+                                    required 
+                                    style={{ paddingLeft: '40px' }} 
+                                />
                             </div>
                         </>
                     )}

@@ -110,17 +110,41 @@ app.post('/api/promote', async (req, res) => {
 });
 
 // F. PAYHERE HASH GENERATION
+
+
+// Ensure crypto is imported at the top of file: const crypto = require('crypto');
 app.post('/api/generate-hash', (req, res) => {
-    const merchantSecret = process.env.MERCHANT_SECRET;
-    const merchantId = process.env.MERCHANT_ID;
     const { order_id, amount, currency } = req.body;
     
-    if (!merchantSecret) return res.status(500).json({ error: "Merchant Secret missing" });
+    // 1. Credentials
+    const merchant_id = "1233644"; 
+    const merchant_secret = "NDMxNDQ2NTQxNjE1Nzk2NzY5MTM4MzI4"; // Make sure no spaces at the end!
 
-    const hash = crypto.createHash('md5')
-        .update(merchantId + order_id + amount + currency + crypto.createHash('md5').update(merchantSecret).digest('hex').toUpperCase())
-        .digest('hex').toUpperCase();
+    if (!merchant_id || !merchant_secret) {
+        return res.status(500).json({ error: "Merchant creds missing" });
+    }
+
+    // 2. Format Amount: Ensure it has 2 decimals (e.g., "100.00")
+    // We remove commas just in case (e.g., "1,000" becomes "1000")
+    const amountFormatted = parseFloat(amount.toString().replace(/,/g, '')).toFixed(2); 
+
+    // 3. Hash Generation
+    const hashedSecret = crypto.createHash('md5').update(merchant_secret).digest('hex').toUpperCase();
     
+    // Hardcoding currency to "LKR" to match your frontend
+    const hashString = merchant_id + order_id + amountFormatted + "LKR" + hashedSecret;
+    const hash = crypto.createHash('md5').update(hashString).digest('hex').toUpperCase();
+
+    // 👇 DEBUGGING LOGS (Check your VS Code Terminal for this!) 👇
+    console.log("=========================================");
+    console.log("🔵 Order ID:", order_id);
+    console.log("🔵 Amount (Original):", amount);
+    console.log("🔵 Amount (Formatted):", amountFormatted);
+    console.log("🔵 Currency:", "LKR");
+    console.log("🔥 FULL STRING BEING HASHED:", hashString); 
+    console.log("✅ GENERATED HASH:", hash);
+    console.log("=========================================");
+
     res.json({ hash });
 });
 
