@@ -1,126 +1,399 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import './App.css'; 
-import { FaHistory, FaHandHoldingHeart, FaWallet, FaCheckCircle, FaTimesCircle, FaClock, FaTree, FaBookOpen, FaUtensils } from 'react-icons/fa';
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import {
+  Box,
+  Container,
+  Grid,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  AppBar,
+  Toolbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  CircularProgress,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+} from "@mui/material";
+import { styled } from "@mui/material/styles";
+import LogoutIcon from "@mui/icons-material/Logout";
+import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
+import FavoriteIcon from "@mui/icons-material/Favorite";
+import HistoryIcon from "@mui/icons-material/History";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ErrorIcon from "@mui/icons-material/Error";
+import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
+import RefreshIcon from "@mui/icons-material/Refresh";
+
+const StatsCard = styled(Card)(({ theme }) => ({
+  borderRadius: "16px",
+  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
+  transition: "transform 0.3s, box-shadow 0.3s",
+  "&:hover": {
+    transform: "translateY(-8px)",
+    boxShadow: "0 8px 30px rgba(0, 0, 0, 0.12)",
+  },
+}));
+
+const GradientCard = styled(Card)(({ theme, gradient }) => ({
+  background: gradient || "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+  color: "white",
+  borderRadius: "16px",
+  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
+}));
 
 function UserDashboard({ userEmail, onDonateClick, onLogout }) {
-    const [user, setUser] = useState(null);
-    const [totalDonated, setTotalDonated] = useState(0);
+  const [user, setUser] = useState(null);
+  const [totalDonated, setTotalDonated] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [openDialog, setOpenDialog] = useState(false);
 
-    // LOGIC SAME AS BEFORE
-    useEffect(() => {
-        axios.get('http://localhost:5000/api/users')
-            .then(res => {
-                const myProfile = res.data.find(u => u.email === userEmail);
-                if (myProfile) {
-                    setUser(myProfile);
-                    const sum = myProfile.donations
-                        .filter(d => d.status === 'Success')
-                        .reduce((acc, curr) => acc + Number(curr.amount), 0);
-                    setTotalDonated(sum);
-                }
-            })
-            .catch(err => console.error("Error loading data", err));
-    }, [userEmail]);
+  useEffect(() => {
+    if (userEmail) {
+      fetchUserData();
+    }
+  }, [userEmail]);
 
-    const getStatusBadge = (status) => {
-        if (status === 'Success') return <span className="badge success"><FaCheckCircle/> Success</span>;
-        if (status === 'Failed') return <span className="badge failed"><FaTimesCircle/> Failed</span>;
-        return <span className="badge pending"><FaClock/> Pending</span>;
+  const fetchUserData = () => {
+    setLoading(true);
+    axios
+      .get("http://localhost:5000/api/user/profile")
+      .then((res) => {
+        setUser(res.data);
+        const sum = res.data.donations
+          .filter((d) => d.status === "Success")
+          .reduce((acc, curr) => acc + Number(curr.amount), 0);
+        setTotalDonated(sum);
+      })
+      .catch((err) => {
+        // Error loading data
+      })
+      .finally(() => setLoading(false));
+  };
+
+  const getStatusChip = (status) => {
+    const statusConfig = {
+      Success: { icon: <CheckCircleIcon />, color: "success" },
+      Failed: { icon: <ErrorIcon />, color: "error" },
+      Pending: { icon: <HourglassEmptyIcon />, color: "warning" },
     };
-
+    const config = statusConfig[status] || statusConfig.Pending;
     return (
-        <div style={{ width: '100%', maxWidth: '1000px', padding: '20px' }}>
-            
-            {/* 1. TOP STATS */}
-            <div className="stats-container">
-                <div className="stat-card">
-                    <div className="stat-icon" style={{background: '#e0e7ff', color: '#6366f1'}}><FaWallet/></div>
-                    
-                    {/* 👇 UPDATED TO RUPEE SYMBOL */}
-                    <div><h3>₹ {totalDonated}</h3><p>My Contribution</p></div>
-                    
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon" style={{background: '#dcfce7', color: '#166534'}}><FaHandHoldingHeart/></div>
-                    <div><h3>{user?.donations?.length || 0}</h3><p>Donations Made</p></div>
-                </div>
-            </div>
-
-            {/* 2. MAIN WELCOME CARD */}
-            <div className="card" style={{ marginTop: '20px', textAlign: 'left', animation: 'fadeIn 0.8s' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h2 className="title">👋 Hello, {user?.name || 'Changemaker'}</h2>
-                    <button onClick={onLogout} style={{ color: '#dc3545', fontWeight: 'bold', background: 'none', border: 'none', cursor: 'pointer' }}>Logout</button>
-                </div>
-                
-                {/* 🎨 DECORATION: MISSION SECTION */}
-                <div className="mission-section" style={{marginTop: '20px', background: '#f9fafb', padding: '20px', borderRadius: '12px'}}>
-                    <h3 style={{color: '#4c1d95', marginBottom: '15px'}}>🌍 Where does your money go?</h3>
-                    
-                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px'}}>
-                        {/* Cause 1 */}
-                        <div style={{background: 'white', padding: '15px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)'}}>
-                            <FaBookOpen style={{color: '#3b82f6', fontSize: '24px', marginBottom: '10px'}}/>
-                            <h4 style={{margin: '0 0 5px 0'}}>Educating Poor Children</h4>
-                            <p style={{fontSize: '12px', color: '#666'}}>We provide books, uniforms, and tuition fees to underprivileged kids in rural areas.</p>
-                        </div>
-
-                        {/* Cause 2 */}
-                        <div style={{background: 'white', padding: '15px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)'}}>
-                            <FaUtensils style={{color: '#f59e0b', fontSize: '24px', marginBottom: '10px'}}/>
-                            <h4 style={{margin: '0 0 5px 0'}}>Food for Everyone</h4>
-                            <p style={{fontSize: '12px', color: '#666'}}>No child should sleep hungry. We run daily food drives for the homeless.</p>
-                        </div>
-
-                        {/* Cause 3 */}
-                        <div style={{background: 'white', padding: '15px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)'}}>
-                            <FaTree style={{color: '#10b981', fontSize: '24px', marginBottom: '10px'}}/>
-                            <h4 style={{margin: '0 0 5px 0'}}>Green Earth Initiative</h4>
-                            <p style={{fontSize: '12px', color: '#666'}}>Partnering with planting associations to plant 10,000 trees this year.</p>
-                        </div>
-                    </div>
-                    
-                    <div style={{marginTop: '15px', fontSize: '13px', color: '#555', fontStyle: 'italic', borderTop: '1px solid #eee', paddingTop: '10px'}}>
-                        <strong>Why Donate?</strong> Your small contribution can buy a book, feed a family, or plant a life. We ensure 100% transparency.
-                    </div>
-                </div>
-
-                <button onClick={onDonateClick} className="donate-btn big-btn" style={{ marginTop: '20px' }}>
-                    <FaHandHoldingHeart style={{ marginRight: '10px' }} />
-                    Make a Difference Today
-                </button>
-            </div>
-
-            {/* 3. HISTORY TABLE (Logic Same) */}
-            <div className="card" style={{ marginTop: '20px', animation: 'slideUp 1s' }}>
-                <h3 style={{ display: 'flex', alignItems: 'center', color: '#333' }}>
-                    <FaHistory style={{ marginRight: '10px', color: '#667eea' }} />
-                    Your Impact History
-                </h3>
-                <div className="table-wrapper">
-                    <table className="custom-table">
-                        <thead><tr><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
-                        <tbody>
-                            {user?.donations?.slice().reverse().map((item, index) => ( 
-                                <tr key={index}>
-                                    <td>{new Date(item.date).toLocaleDateString()}</td>
-                                    
-                                    {/* 👇 UPDATED TO RUPEE SYMBOL */}
-                                    <td style={{ fontWeight: 'bold' }}>₹ {item.amount}</td>
-                                    
-                                    <td>{getStatusBadge(item.status)}</td>
-                                </tr>
-                            ))}
-                            {(!user?.donations || user.donations.length === 0) && (
-                                <tr><td colSpan="3" style={{textAlign:'center', padding:'20px'}}>No donations yet. Start your journey today!</td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+      <Chip
+        icon={config.icon}
+        label={status}
+        color={config.color}
+        variant="outlined"
+      />
     );
+  };
+
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ minHeight: "100vh", background: "#f5f7fa" }}>
+      {/* Header */}
+      <AppBar
+        position="static"
+        sx={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}
+      >
+        <Toolbar>
+          <Typography
+            variant="h6"
+            component="div"
+            sx={{ flexGrow: 1, fontWeight: 700 }}
+          >
+            💙 Donor Dashboard
+          </Typography>
+          <IconButton
+            color="inherit"
+            onClick={fetchUserData}
+            title="Refresh data"
+            sx={{ mr: 1 }}
+          >
+            <RefreshIcon />
+          </IconButton>
+          <IconButton
+            color="inherit"
+            onClick={() => setOpenDialog(true)}
+            title="Logout"
+          >
+            <LogoutIcon />
+          </IconButton>
+        </Toolbar>
+      </AppBar>
+
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        {/* Welcome Section */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+            Welcome back, {user?.name}! 👋
+          </Typography>
+          <Typography variant="body1" color="textSecondary">
+            Your generosity is making a real difference in the world
+          </Typography>
+        </Box>
+
+        {/* Stats Grid */}
+        <Grid
+          container
+          spacing={2}
+          sx={{
+            mb: 4,
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(0, 1fr))",
+          }}
+        >
+          <Grid
+            item
+            xs={12}
+            sm={6}
+            lg={4}
+            sx={{ display: "flex", minWidth: 0 }}
+          >
+            <GradientCard
+              gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+              sx={{ width: "100%" }}
+            >
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                  <FavoriteIcon sx={{ fontSize: 40, mr: 2 }} />
+                  <Box>
+                    <Typography
+                      color="inherit"
+                      variant="body2"
+                      sx={{ opacity: 0.8 }}
+                    >
+                      Total Donated
+                    </Typography>
+                    <Typography
+                      color="inherit"
+                      variant="h5"
+                      sx={{ fontWeight: 700 }}
+                    >
+                      ₹{totalDonated.toLocaleString()}
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </GradientCard>
+          </Grid>
+
+          <Grid
+            item
+            xs={12}
+            sm={6}
+            lg={4}
+            sx={{ display: "flex", minWidth: 0 }}
+          >
+            <GradientCard
+              gradient="linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
+              sx={{ width: "100%" }}
+            >
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                  <HistoryIcon sx={{ fontSize: 40, mr: 2 }} />
+                  <Box>
+                    <Typography
+                      color="inherit"
+                      variant="body2"
+                      sx={{ opacity: 0.8 }}
+                    >
+                      Donations Made
+                    </Typography>
+                    <Typography
+                      color="inherit"
+                      variant="h5"
+                      sx={{ fontWeight: 700 }}
+                    >
+                      {user?.donations?.length || 0}
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </GradientCard>
+          </Grid>
+
+          <Grid
+            item
+            xs={12}
+            sm={6}
+            lg={4}
+            sx={{ display: "flex", minWidth: 0 }}
+          >
+            <GradientCard
+              gradient="linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
+              sx={{ width: "100%" }}
+            >
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                  <CheckCircleIcon sx={{ fontSize: 40, mr: 2 }} />
+                  <Box>
+                    <Typography
+                      color="inherit"
+                      variant="body2"
+                      sx={{ opacity: 0.8 }}
+                    >
+                      Successful Donations
+                    </Typography>
+                    <Typography
+                      color="inherit"
+                      variant="h5"
+                      sx={{ fontWeight: 700 }}
+                    >
+                      {user?.donations?.filter((d) => d.status === "Success")
+                        ?.length || 0}
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </GradientCard>
+          </Grid>
+        </Grid>
+
+        {/* Donation Button */}
+        <Box sx={{ mb: 4, textAlign: "center" }}>
+          <Button
+            variant="contained"
+            size="large"
+            onClick={onDonateClick}
+            startIcon={<FavoriteBorderIcon />}
+            sx={{
+              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              px: 4,
+              py: 1.5,
+              fontWeight: 600,
+              fontSize: "16px",
+            }}
+          >
+            Make a Donation
+          </Button>
+        </Box>
+
+        {/* Recent Donations Table */}
+        <StatsCard>
+          <CardContent>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+              💳 Transaction History
+            </Typography>
+
+            {user?.donations && user.donations.length > 0 ? (
+              <TableContainer component={Paper}>
+                <Table>
+                  <TableHead sx={{ background: "#f5f7fa" }}>
+                    <TableRow>
+                      <TableCell
+                        sx={{
+                          fontWeight: 700,
+                          width: "33.33%",
+                          textAlign: "center",
+                        }}
+                      >
+                        Date
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          fontWeight: 700,
+                          width: "33.33%",
+                          textAlign: "center",
+                        }}
+                      >
+                        Amount
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          fontWeight: 700,
+                          width: "33.33%",
+                          textAlign: "center",
+                        }}
+                      >
+                        Status
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {[...user.donations].reverse().map((donation, index) => (
+                      <TableRow key={index} hover>
+                        <TableCell
+                          sx={{ width: "33.33%", textAlign: "center" }}
+                        >
+                          {new Date(donation.date).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            fontWeight: 600,
+                            width: "33.33%",
+                            textAlign: "center",
+                          }}
+                        >
+                          ₹{donation.amount}
+                        </TableCell>
+                        <TableCell
+                          sx={{ width: "33.33%", textAlign: "center" }}
+                        >
+                          {getStatusChip(donation.status)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Box sx={{ textAlign: "center", py: 3 }}>
+                <Typography color="textSecondary">
+                  No donations yet. Start making a difference today! 💚
+                </Typography>
+              </Box>
+            )}
+          </CardContent>
+        </StatsCard>
+      </Container>
+
+      {/* Logout Dialog */}
+      <Dialog open={openDialog} onClose={() => setOpenDialog(false)}>
+        <DialogTitle>Confirm Logout</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to logout?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              setOpenDialog(false);
+              onLogout();
+            }}
+            variant="contained"
+            color="error"
+          >
+            Logout
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
 }
 
 export default UserDashboard;

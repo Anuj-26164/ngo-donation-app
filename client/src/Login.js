@@ -1,126 +1,366 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import './App.css';
-import { FiMail, FiLock, FiUser, FiPhone } from 'react-icons/fi';
-// removed FaHandHoldingHeart since it wasn't used in the view, but you can keep it if needed
+import React, { useState } from "react";
+import axios from "axios";
+import {
+  Box,
+  Card,
+  CardContent,
+  TextField,
+  Button,
+  Typography,
+  Container,
+  CircularProgress,
+  Alert,
+  Tab,
+  Tabs,
+  InputAdornment,
+  IconButton,
+} from "@mui/material";
+import { styled } from "@mui/material/styles";
+import LoginIcon from "@mui/icons-material/Login";
+import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import FavoriteIcon from "@mui/icons-material/Favorite";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+
+const StyledCard = styled(Card)(({ theme }) => ({
+  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
+  borderRadius: "16px",
+  background: "linear-gradient(135deg, #ffffff 0%, #F9FAFB 100%)",
+  backdropFilter: "blur(10px)",
+}));
+
+const GradientBox = styled(Box)(({ theme }) => ({
+  background: "#1F4ED8",
+  color: "white",
+  padding: theme.spacing(4),
+  borderRadius: "16px 16px 0 0",
+  textAlign: "center",
+}));
+
+function TabPanel(props) {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`tabpanel-${index}`}
+      aria-labelledby={`tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  );
+}
 
 function Login({ onLogin }) {
-    const [isSignup, setIsSignup] = useState(false); 
-    
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [name, setName] = useState('');
-    const [phone, setPhone] = useState('');
+  const [tabValue, setTabValue] = useState(0);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+    setError("");
+    setSuccess("");
+  };
 
-        // 👇 FIX 1: VALIDATION LOGIC BEFORE API CALL 👇
-        if (isSignup) {
-            // Check if phone number is exactly 10 digits
-            if (!phone || phone.length !== 10) {
-                alert("Please enter a valid 10-digit Mobile Number!");
-                return; // 🛑 Stop here, do not send request
-            }
-        }
+  const validateForm = () => {
+    if (tabValue === 0) {
+      // Login
+      if (!email || !password) {
+        setError("Email and password are required");
+        return false;
+      }
+    } else {
+      // Signup
+      if (!name || !email || !password || !phone) {
+        setError("All fields are required");
+        return false;
+      }
+      if (phone.length !== 10 || isNaN(phone)) {
+        setError("Phone number must be exactly 10 digits");
+        return false;
+      }
+    }
+    return true;
+  };
 
-        // --- EXISTING LOGIC ---
-        if (isSignup) {
-            try {
-                const res = await axios.post('http://localhost:5000/api/register', { name, email, phone, password });
-                alert("Account Created! Logging you in...");
-                onLogin(res.data.user.role, res.data.user); 
-            } catch (err) {
-                alert(err.response?.data?.message || "Error signing up");
-            }
-        } else {
-            try {
-                const res = await axios.post('http://localhost:5000/api/login', { email, password });
-                onLogin(res.data.user.role, res.data.user);
-            } catch (err) {
-                alert("Invalid Credentials");
-            }
-        }
-    };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
 
-    return (
-        <div className="container">
-            <div className="card" style={{animation: 'fadeIn 1s'}}>
-                
-                {/* 🎨 DECORATION 1: Image */}
-                <img 
-                    src="https://cdn-icons-png.flaticon.com/512/4522/4522549.png" 
-                    alt="Charity" 
-                    className="illustration"
-                    style={{width: '120px', marginBottom: '10px'}}
+    if (!validateForm()) return;
+
+    setLoading(true);
+
+    try {
+      if (tabValue === 0) {
+        // Login
+        const res = await axios.post("http://localhost:5000/api/login", {
+          email,
+          password,
+        });
+        // Store JWT token and user data
+        localStorage.setItem("token", res.data.token);
+        localStorage.setItem("user", JSON.stringify(res.data.user));
+        setSuccess("Login successful! Redirecting...");
+        setTimeout(() => {
+          onLogin(res.data.user.role, res.data.user);
+        }, 1000);
+      } else {
+        // Signup
+        const res = await axios.post("http://localhost:5000/api/register", {
+          name,
+          email,
+          phone,
+          password,
+        });
+        // Store JWT token and user data
+        localStorage.setItem("token", res.data.token);
+        localStorage.setItem("user", JSON.stringify(res.data.user));
+        setSuccess("Account created successfully! Logging you in...");
+        setTimeout(() => {
+          onLogin(res.data.user.role, res.data.user);
+        }, 1000);
+      }
+    } catch (err) {
+      // Login/Register error handled
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "An error occurred. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        py: 4,
+      }}
+    >
+      <Container maxWidth="sm">
+        <StyledCard>
+          {/* Header */}
+          <GradientBox>
+            <FavoriteIcon sx={{ fontSize: 48, mb: 2 }} />
+            <Typography variant="h4" component="div" sx={{ fontWeight: 700 }}>
+              Help Change Lives
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
+              Join our community of donors
+            </Typography>
+          </GradientBox>
+
+          <CardContent sx={{ p: 0 }}>
+            {/* Tabs */}
+            <Tabs
+              value={tabValue}
+              onChange={handleTabChange}
+              variant="fullWidth"
+              indicatorColor="primary"
+              textColor="primary"
+            >
+              <Tab
+                label="Login"
+                icon={<LoginIcon />}
+                iconPosition="start"
+                id="tab-0"
+              />
+              <Tab
+                label="Sign Up"
+                icon={<PersonAddIcon />}
+                iconPosition="start"
+                id="tab-1"
+              />
+            </Tabs>
+
+            {/* Alerts */}
+            {error && (
+              <Alert severity="error" sx={{ m: 2, mb: 1 }}>
+                {error}
+              </Alert>
+            )}
+            {success && (
+              <Alert severity="success" sx={{ m: 2, mb: 1 }}>
+                {success}
+              </Alert>
+            )}
+
+            {/* Login Tab */}
+            <TabPanel value={tabValue} index={0}>
+              <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+                <TextField
+                  fullWidth
+                  label="Email Address"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  margin="normal"
+                  variant="outlined"
+                  placeholder="your@email.com"
                 />
 
-                <h1 className="title" style={{color: '#4c1d95'}}>💙 Hope Foundation</h1>
-                
-                {/* 🎨 DECORATION 2: Thought of the Day */}
-                <div className="thought-box" style={{margin: '15px 0', padding: '10px', background: '#f3e8ff', borderRadius: '8px', borderLeft: '4px solid #7c3aed'}}>
-                    <p style={{fontSize: '13px', fontStyle: 'italic', color: '#555', margin: 0}}>
-                        "The best way to find yourself is to lose yourself in the service of others."
-                    </p>
-                    <span style={{fontSize: '11px', fontWeight: 'bold', color: '#7c3aed'}}>- Mahatma Gandhi</span>
-                </div>
+                <TextField
+                  fullWidth
+                  label="Password"
+                  type={showLoginPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  margin="normal"
+                  variant="outlined"
+                  placeholder="Enter your password"
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() =>
+                            setShowLoginPassword(!showLoginPassword)
+                          }
+                          edge="end"
+                          sx={{ color: "#1F4ED8" }}
+                        >
+                          {showLoginPassword ? (
+                            <VisibilityOffIcon />
+                          ) : (
+                            <VisibilityIcon />
+                          )}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
 
-                <p className="subtitle">{isSignup ? "Join our community of changemakers." : "Welcome back, kindness dealer!"}</p>
+                <Button
+                  fullWidth
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  disabled={loading}
+                  sx={{
+                    mt: 3,
+                    background:
+                      "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                    fontWeight: 600,
+                    py: 1.5,
+                  }}
+                >
+                  {loading ? <CircularProgress size={24} /> : "Login"}
+                </Button>
+              </Box>
+            </TabPanel>
 
-                <form onSubmit={handleSubmit} className="form">
-                    {isSignup && (
-                        <>
-                            <div className="input-wrapper">
-                                <FiUser className="input-icon" />
-                                <input type="text" placeholder="Full Name" value={name} onChange={(e) => setName(e.target.value)} required style={{ paddingLeft: '40px' }} />
-                            </div>
-                            
-                            <div className="input-wrapper">
-                                <FiPhone className="input-icon" />
-                                {/* 👇 FIX 2: RESTRICT INPUT TO NUMBERS & 10 DIGITS ONLY 👇 */}
-                                <input 
-                                    type="text" 
-                                    placeholder="Phone (10 digits)" 
-                                    maxLength="10" 
-                                    value={phone} 
-                                    onChange={(e) => {
-                                        // Only allow numbers (RegEx)
-                                        const re = /^[0-9\b]+$/;
-                                        if (e.target.value === '' || re.test(e.target.value)) {
-                                            setPhone(e.target.value);
-                                        }
-                                    }} 
-                                    required 
-                                    style={{ paddingLeft: '40px' }} 
-                                />
-                            </div>
-                        </>
-                    )}
+            {/* Sign Up Tab */}
+            <TabPanel value={tabValue} index={1}>
+              <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+                <TextField
+                  fullWidth
+                  label="Full Name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  margin="normal"
+                  variant="outlined"
+                  placeholder="Your full name"
+                />
 
-                    <div className="input-wrapper">
-                        <FiMail className="input-icon" />
-                        <input type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ paddingLeft: '40px' }} />
-                    </div>
+                <TextField
+                  fullWidth
+                  label="Email Address"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  margin="normal"
+                  variant="outlined"
+                  placeholder="your@email.com"
+                />
 
-                    <div className="input-wrapper">
-                        <FiLock className="input-icon" />
-                        <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ paddingLeft: '40px' }} />
-                    </div>
+                <TextField
+                  fullWidth
+                  label="Phone Number"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  margin="normal"
+                  variant="outlined"
+                  placeholder="10-digit phone number"
+                  inputProps={{ maxLength: 10 }}
+                />
 
-                    <button type="submit" className="donate-btn big-btn">
-                        {isSignup ? "Sign Up & Donate" : "Login Securely"}
-                    </button>
-                </form>
+                <TextField
+                  fullWidth
+                  label="Password"
+                  type={showSignupPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  margin="normal"
+                  variant="outlined"
+                  placeholder="Create a strong password"
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() =>
+                            setShowSignupPassword(!showSignupPassword)
+                          }
+                          edge="end"
+                          sx={{ color: "#1F4ED8" }}
+                        >
+                          {showSignupPassword ? (
+                            <VisibilityOffIcon />
+                          ) : (
+                            <VisibilityIcon />
+                          )}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
 
-                <p style={{ fontSize: '13px', marginTop: '15px', color: '#666' }}>
-                    {isSignup ? "Already have an account?" : "New here?"} 
-                    <span onClick={() => setIsSignup(!isSignup)} style={{ color: '#667eea', fontWeight: 'bold', cursor: 'pointer', marginLeft: '5px' }}>
-                        {isSignup ? "Login" : "Create Account"}
-                    </span>
-                </p>
-            </div>
-        </div>
-    );
+                <Button
+                  fullWidth
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  disabled={loading}
+                  sx={{
+                    mt: 3,
+                    background:
+                      "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                    fontWeight: 600,
+                    py: 1.5,
+                  }}
+                >
+                  {loading ? <CircularProgress size={24} /> : "Create Account"}
+                </Button>
+              </Box>
+            </TabPanel>
+
+            {/* Footer */}
+            <Box
+              sx={{ p: 3, textAlign: "center", borderTop: "1px solid #eee" }}
+            >
+              <Typography variant="body2" color="textSecondary">
+                Every donation makes a difference ❤️
+              </Typography>
+            </Box>
+          </CardContent>
+        </StyledCard>
+      </Container>
+    </Box>
+  );
 }
 
 export default Login;
