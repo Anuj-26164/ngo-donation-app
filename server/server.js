@@ -1,170 +1,232 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const crypto = require('crypto');
-require('dotenv').config();
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const crypto = require("crypto");
+require("dotenv").config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 // NEW CODE (Use this)
-mongoose.connect('mongodb://127.0.0.1:27017/ngo_project')
-.then(() => console.log("MongoDB Connected Successfully"))
-.catch(err => console.error("MongoDB Error:", err));
+mongoose
+  .connect("mongodb://127.0.0.1:27017/ngo_project")
+  .then(() => console.log("MongoDB Connected Successfully"))
+  .catch((err) => console.error("MongoDB Error:", err));
 // 2. DEFINE USER SCHEMA (Updated with Password & Role)
 const userSchema = new mongoose.Schema({
-    name: String,
-    email: { type: String, unique: true }, // Ensure unique emails
-    phone: String,
-    password: { type: String, required: true }, // New Field
-    role: { type: String, default: 'user' },    // New Field: 'user' or 'admin'
-    donations: [{
-        amount: String,
-        date: { type: Date, default: Date.now },
-        status: String
-    }]
+  name: String,
+  email: { type: String, unique: true }, // Ensure unique emails
+  phone: String,
+  password: { type: String, required: true }, // New Field
+  role: { type: String, default: "user" }, // New Field: 'user' or 'admin'
+  donations: [
+    {
+      amount: String,
+      date: { type: Date, default: Date.now },
+      status: String,
+    },
+  ],
 });
 
-const User = mongoose.model('User', userSchema);
+const User = mongoose.model("User", userSchema);
+
+async function seedSuperAdmin() {
+  const adminEmail = "admin@gmail.com";
+  const adminPassword = "admin123";
+
+  const existingAdmin = await User.findOne({ email: adminEmail });
+
+  if (!existingAdmin) {
+    await User.create({
+      name: "Super Admin",
+      email: adminEmail,
+      phone: "0000000000",
+      password: adminPassword,
+      role: "admin",
+    });
+    console.log("✅ Super Admin auto-created");
+  } else {
+    console.log("ℹ️ Super Admin already exists");
+  }
+}
+
+seedSuperAdmin();
+
 
 // --- ROUTES ---
 
 // A. REGISTER / SIGNUP
-app.post('/api/register', async (req, res) => {
-    const { name, email, phone, password } = req.body;
-    try {
-        // ... (existing check for user existence) ...
+app.post("/api/register", async (req, res) => {
+  const { name, email, phone, password } = req.body;
 
-        // 👇 CHANGE THIS LINE 👇
-        // If email is 'admin@gmail.com', make them Admin. Everyone else is User.
-        const role = (email === "admin@gmail.com") ? "admin" : "user"; 
-
-        const newUser = new User({ name, email, phone, password, role: role }); // Use the variable
-        await newUser.save();
-        res.json({ message: "Registration Successful", user: newUser });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+  try {
+    // ✅ CHECK IF USER ALREADY EXISTS
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "Email already registered" });
     }
+
+    // Assign role
+    const role = email === "admin@gmail.com" ? "admin" : "user";
+
+    const newUser = new User({
+      name,
+      email,
+      phone,
+      password,
+      role,
+    });
+
+    await newUser.save();
+
+    res.json({
+      message: "Registration Successful",
+      user: {
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+      },
+    });
+  } catch (err) {
+    console.error("REGISTER ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // B. REAL LOGIN (Checks DB for Email & Password)
-app.post('/api/login', async (req, res) => {
-    const { email, password } = req.body;
-    try {
-        const user = await User.findOne({ email });
-        if (!user) return res.status(404).json({ message: "User not found" });
+app.post("/api/login", async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-        // Simple password check (In production, use hashing like bcrypt)
-        if (user.password !== password) {
-            return res.status(401).json({ message: "Invalid Password" });
-        }
-
-        // Return user info AND their role
-        res.json({ 
-            message: "Login Success", 
-            user: { 
-                name: user.name, 
-                email: user.email, 
-                phone: user.phone, 
-                role: user.role 
-            } 
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+    // Simple password check (In production, use hashing like bcrypt)
+    if (user.password !== password) {
+      return res.status(401).json({ message: "Invalid Password" });
     }
+
+    // Return user info AND their role
+    res.json({
+      message: "Login Success",
+      user: {
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // C. ADD DONATION (For existing users)
-app.post('/api/donate', async (req, res) => {
-    const { email, amount, status } = req.body;
-    try {
-        const user = await User.findOne({ email });
-        if (user) {
-            user.donations.push({ amount, status });
-            await user.save();
-            res.json({ message: "Donation Added" });
-        } else {
-            res.status(404).json({ message: "User not found" });
-        }
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+app.post("/api/donate", async (req, res) => {
+  const { email, amount, status } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (user) {
+      user.donations.push({ amount, status });
+      await user.save();
+      res.json({ message: "Donation Added" });
+    } else {
+      res.status(404).json({ message: "User not found" });
     }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // D. GET ALL USERS (For Admin Dashboard)
-app.get('/api/users', async (req, res) => {
-    try {
-        const users = await User.find().sort({ _id: -1 });
-        res.json(users);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+app.get("/api/users", async (req, res) => {
+  try {
+    const users = await User.find().sort({ _id: -1 });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // E. PROMOTE TO ADMIN (Superadmin Power)
-app.post('/api/promote', async (req, res) => {
-    const { email } = req.body;
-    try {
-        await User.findOneAndUpdate({ email }, { role: 'admin' });
-        res.json({ message: "User Promoted to Admin" });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+app.post("/api/promote", async (req, res) => {
+  const { email } = req.body;
+  try {
+    await User.findOneAndUpdate({ email }, { role: "admin" });
+    res.json({ message: "User Promoted to Admin" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // F. PAYHERE HASH GENERATION
 
-
 // Ensure crypto is imported at the top of file: const crypto = require('crypto');
-app.post('/api/generate-hash', (req, res) => {
-    const { order_id, amount, currency } = req.body;
-    
-    // 1. Credentials
-    const merchant_id = "1233644"; 
-    const merchant_secret = "NDMxNDQ2NTQxNjE1Nzk2NzY5MTM4MzI4"; // Make sure no spaces at the end!
+app.post("/api/generate-hash", (req, res) => {
+  const { order_id, amount, currency } = req.body;
 
-    if (!merchant_id || !merchant_secret) {
-        return res.status(500).json({ error: "Merchant creds missing" });
-    }
+  // 1. Credentials
+  const merchant_id = "1233644";
+  const merchant_secret = "NDMxNDQ2NTQxNjE1Nzk2NzY5MTM4MzI4"; // Make sure no spaces at the end!
 
-    // 2. Format Amount: Ensure it has 2 decimals (e.g., "100.00")
-    // We remove commas just in case (e.g., "1,000" becomes "1000")
-    const amountFormatted = parseFloat(amount.toString().replace(/,/g, '')).toFixed(2); 
+  if (!merchant_id || !merchant_secret) {
+    return res.status(500).json({ error: "Merchant creds missing" });
+  }
 
-    // 3. Hash Generation
-    const hashedSecret = crypto.createHash('md5').update(merchant_secret).digest('hex').toUpperCase();
-    
-    // Hardcoding currency to "LKR" to match your frontend
-    const hashString = merchant_id + order_id + amountFormatted + "LKR" + hashedSecret;
-    const hash = crypto.createHash('md5').update(hashString).digest('hex').toUpperCase();
+  // 2. Format Amount: Ensure it has 2 decimals (e.g., "100.00")
+  // We remove commas just in case (e.g., "1,000" becomes "1000")
+  const amountFormatted = parseFloat(
+    amount.toString().replace(/,/g, ""),
+  ).toFixed(2);
 
-    // 👇 DEBUGGING LOGS (Check your VS Code Terminal for this!) 👇
-    console.log("=========================================");
-    console.log("🔵 Order ID:", order_id);
-    console.log("🔵 Amount (Original):", amount);
-    console.log("🔵 Amount (Formatted):", amountFormatted);
-    console.log("🔵 Currency:", "LKR");
-    console.log("🔥 FULL STRING BEING HASHED:", hashString); 
-    console.log("✅ GENERATED HASH:", hash);
-    console.log("=========================================");
+  // 3. Hash Generation
+  const hashedSecret = crypto
+    .createHash("md5")
+    .update(merchant_secret)
+    .digest("hex")
+    .toUpperCase();
 
-    res.json({ hash });
+  // Hardcoding currency to "LKR" to match your frontend
+  const hashString =
+    merchant_id + order_id + amountFormatted + "LKR" + hashedSecret;
+  const hash = crypto
+    .createHash("md5")
+    .update(hashString)
+    .digest("hex")
+    .toUpperCase();
+
+  // 👇 DEBUGGING LOGS (Check your VS Code Terminal for this!) 👇
+  console.log("=========================================");
+  console.log("🔵 Order ID:", order_id);
+  console.log("🔵 Amount (Original):", amount);
+  console.log("🔵 Amount (Formatted):", amountFormatted);
+  console.log("🔵 Currency:", "LKR");
+  console.log("🔥 FULL STRING BEING HASHED:", hashString);
+  console.log("✅ GENERATED HASH:", hash);
+  console.log("=========================================");
+
+  res.json({ hash });
 });
 
 // G. DEMOTE TO USER (With Superadmin Protection)
-app.post('/api/demote', async (req, res) => {
-    const { email } = req.body;
+app.post("/api/demote", async (req, res) => {
+  const { email } = req.body;
 
-    // 🔒 SECURITY CHECK: Prevent Superadmin Demotion
-    // Make sure this email matches EXACTLY with your Superadmin email
-    if (email === 'admin@gmail.com') { 
-        return res.status(403).json({ message: "Action Denied! Cannot demote Super Admin." });
-    }
+  // 🔒 SECURITY CHECK: Prevent Superadmin Demotion
+  // Make sure this email matches EXACTLY with your Superadmin email
+  if (email === "admin@gmail.com") {
+    return res
+      .status(403)
+      .json({ message: "Action Denied! Cannot demote Super Admin." });
+  }
 
-    try {
-        // Role wapas 'user' kar do
-        await User.findOneAndUpdate({ email }, { role: 'user' });
-        res.json({ message: "User Demoted successfully" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+  try {
+    // Role wapas 'user' kar do
+    await User.findOneAndUpdate({ email }, { role: "user" });
+    res.json({ message: "User Demoted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // START SERVER
